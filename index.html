@@ -1344,10 +1344,13 @@ function updateSplashForProfile() {
   blockEl.textContent = renderBlockText(currentProfile.name);
   const prompt = document.getElementById('splash-prompt');
   const isMobile = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
-  if (currentProfile.level > 1) {
-    prompt.textContent = isMobile ? `TAP TO CONTINUE (LEVEL ${currentProfile.level})` : `PRESS ENTER TO CONTINUE (LEVEL ${currentProfile.level})`;
+  if (isMobile) {
+    // Hide text prompt on mobile — the touch action bar handles it
+    prompt.style.display = 'none';
+  } else if (currentProfile.level > 1) {
+    prompt.textContent = `PRESS ENTER TO CONTINUE (LEVEL ${currentProfile.level})`;
   } else {
-    prompt.textContent = isMobile ? 'TAP TO BEGIN' : 'PRESS ENTER TO BEGIN';
+    prompt.textContent = 'PRESS ENTER TO BEGIN';
   }
 
   // Profile card

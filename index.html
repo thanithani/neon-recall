@@ -35,7 +35,7 @@
   #splash-subtitle { font-size: 14px; letter-spacing: 6px; color: rgba(0,255,255,0.5); text-transform: uppercase; opacity: 0; animation: fadeIn 1s ease-out 1.8s forwards; margin-bottom: 12px; }
   #splash-game-title { font-size: 32px; font-weight: 900; letter-spacing: 12px; color: #0ff; text-shadow: 0 0 30px rgba(0,255,255,0.8), 0 0 60px rgba(0,255,255,0.4); opacity: 0; animation: fadeIn 1s ease-out 0.3s forwards; margin-bottom: 20px; }
   #splash-prompt { font-size: 13px; letter-spacing: 4px; color: rgba(255,255,255,0.5); opacity: 0; animation: promptBlink 1.5s ease-in-out 3s infinite, fadeIn 0.5s ease-out 3s forwards; }
-  .splash-nav { font-size: 12px; letter-spacing: 3px; color: rgba(0,255,255,0.5); opacity: 0; animation: fadeIn 0.5s ease-out 3.3s forwards; margin-top: 10px; cursor: pointer; }
+  .splash-nav { font-size: 12px; letter-spacing: 3px; color: rgba(0,255,255,0.5); pointer-events: auto; opacity: 0; animation: fadeIn 0.5s ease-out 3.3s forwards; margin-top: 10px; cursor: pointer; }
   .splash-nav:hover { color: rgba(0,255,255,0.8); }
 
   /* ── PROFILE CARD ── */
@@ -135,6 +135,22 @@
   .legend-name { color: rgba(255,255,255,0.85); }
   .legend-desc { color: rgba(255,255,255,0.45); font-size: 10px; letter-spacing: 1px; }
 
+  /* ── TOUCH CONTROLS ── */
+  #touch-controls { display: none; position: absolute; bottom: 20px; right: 20px; z-index: 20; pointer-events: auto; }
+  .touch-dpad { display: grid; grid-template-columns: 56px 56px 56px; grid-template-rows: 56px 56px 56px; gap: 4px; }
+  .touch-btn { width: 56px; height: 56px; border: 1px solid rgba(0,255,255,0.3); border-radius: 10px; background: rgba(0,10,20,0.7); color: #0ff; font-size: 22px; display: flex; align-items: center; justify-content: center; cursor: pointer; user-select: none; -webkit-user-select: none; touch-action: manipulation; transition: background 0.1s; }
+  .touch-btn:active { background: rgba(0,255,255,0.2); border-color: #0ff; box-shadow: 0 0 15px rgba(0,255,255,0.3); }
+  .touch-btn.empty { border: none; background: none; }
+  #touch-items { position: absolute; bottom: 20px; left: 20px; display: none; z-index: 20; pointer-events: auto; flex-direction: row; gap: 8px; }
+  .touch-item-btn { width: 52px; height: 52px; border: 1px solid rgba(0,255,255,0.3); border-radius: 10px; background: rgba(0,10,20,0.7); color: #fff; font-size: 24px; display: flex; align-items: center; justify-content: center; cursor: pointer; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+  .touch-item-btn:active { background: rgba(0,255,255,0.2); border-color: #0ff; }
+  #touch-flash-btn { position: absolute; bottom: 200px; right: 20px; display: none; z-index: 20; pointer-events: auto; width: 64px; height: 64px; border: 1px solid rgba(255,255,0,0.4); border-radius: 50%; background: rgba(255,255,0,0.08); color: #ff0; font-size: 11px; font-family: 'Orbitron', monospace; letter-spacing: 2px; text-align: center; line-height: 1.2; cursor: pointer; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+  #touch-flash-btn:active { background: rgba(255,255,0,0.2); box-shadow: 0 0 15px rgba(255,255,0,0.3); }
+  #touch-action-bar { display: none; position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 20; pointer-events: auto; }
+  .touch-action { padding: 14px 28px; border: 1px solid rgba(0,255,255,0.3); border-radius: 10px; background: rgba(0,10,20,0.7); color: #0ff; font-family: 'Orbitron', monospace; font-size: 14px; letter-spacing: 4px; cursor: pointer; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+  .touch-action:active { background: rgba(0,255,255,0.2); border-color: #0ff; }
+  #touch-menu-btn { display: none; position: absolute; top: 20px; right: 20px; z-index: 20; pointer-events: auto; width: 44px; height: 44px; border: 1px solid rgba(0,255,255,0.3); border-radius: 8px; background: rgba(0,10,20,0.7); color: #0ff; font-size: 20px; cursor: pointer; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+
   .scanline { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100; background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px); }
   .vignette { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 99; background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.6) 100%); }
 </style>
@@ -185,6 +201,29 @@
 </div>
 <div class="panel" id="leaderboard"><h2>LEADERBOARD</h2><div id="lb-body"></div><div class="panel-close">ESC TO CLOSE</div></div>
 <div class="panel" id="level-map"><h2>GRID MAP</h2><div id="map-body"></div><div class="panel-close">ESC TO CLOSE</div></div>
+
+<!-- Touch controls -->
+<div id="touch-controls">
+  <div class="touch-dpad">
+    <div class="touch-btn empty"></div>
+    <div class="touch-btn" data-dir="up">▲</div>
+    <div class="touch-btn empty"></div>
+    <div class="touch-btn" data-dir="left">◀</div>
+    <div class="touch-btn empty"></div>
+    <div class="touch-btn" data-dir="right">▶</div>
+    <div class="touch-btn empty"></div>
+    <div class="touch-btn" data-dir="down">▼</div>
+    <div class="touch-btn empty"></div>
+  </div>
+</div>
+<div id="touch-items">
+  <div class="touch-item-btn" data-slot="0"></div>
+  <div class="touch-item-btn" data-slot="1"></div>
+  <div class="touch-item-btn" data-slot="2"></div>
+</div>
+<button id="touch-flash-btn">FLASH</button>
+<div id="touch-action-bar"><div class="touch-action" id="touch-action-main">START</div></div>
+<button id="touch-menu-btn">☰</button>
 
 <div id="ui-overlay">
   <div id="hud" style="display:none;">
@@ -1252,7 +1291,12 @@ function updateSplashForProfile() {
   }
   blockEl.textContent = renderBlockText(currentProfile.name);
   const prompt = document.getElementById('splash-prompt');
-  prompt.textContent = currentProfile.level > 1 ? `PRESS ENTER TO CONTINUE (LEVEL ${currentProfile.level})` : 'PRESS ENTER TO BEGIN';
+  const isMobile = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+  if (currentProfile.level > 1) {
+    prompt.textContent = isMobile ? `TAP TO CONTINUE (LEVEL ${currentProfile.level})` : `PRESS ENTER TO CONTINUE (LEVEL ${currentProfile.level})`;
+  } else {
+    prompt.textContent = isMobile ? 'TAP TO BEGIN' : 'PRESS ENTER TO BEGIN';
+  }
 
   // Profile card
   const rank = getRank(currentProfile.xp);
@@ -2235,11 +2279,133 @@ function gameLoop(now) {
 }
 
 // ═══════════════════════════════════════════════════════
+// TOUCH / MOBILE SUPPORT
+// ═══════════════════════════════════════════════════════
+const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+
+function simulateKey(key) {
+  document.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+}
+
+function showTouchControls() {
+  if (!isTouchDevice) return;
+  const inGame = state === 'playing' || state === 'showing' || state === 'countdown' || state === 'dead' || state === 'complete' || bonusActive;
+  const dpad = document.getElementById('touch-controls');
+  const items = document.getElementById('touch-items');
+  const flashBtn = document.getElementById('touch-flash-btn');
+  const actionBar = document.getElementById('touch-action-bar');
+  const menuBtn = document.getElementById('touch-menu-btn');
+
+  dpad.style.display = (state === 'playing' || (bonusActive && bonusState === 'playing')) ? 'block' : 'none';
+  items.style.display = state === 'playing' && !bonusActive ? 'flex' : 'none';
+  flashBtn.style.display = state === 'playing' && currentMode === 'fog' ? 'block' : 'none';
+  menuBtn.style.display = inGame && !bonusActive ? 'block' : 'none';
+
+  // Action bar: context-dependent main button
+  if (state === 'splash') {
+    actionBar.style.display = 'block';
+    document.getElementById('touch-action-main').textContent = currentProfile && currentProfile.level > 1 ? 'CONTINUE' : 'START';
+  } else if (state === 'dead') {
+    actionBar.style.display = 'block';
+    document.getElementById('touch-action-main').textContent = 'RESPAWN';
+  } else if (state === 'complete' || (bonusActive && bonusState === 'ended')) {
+    actionBar.style.display = 'block';
+    document.getElementById('touch-action-main').textContent = 'NEXT';
+  } else if (state === 'showing' || state === 'countdown') {
+    actionBar.style.display = 'block';
+    document.getElementById('touch-action-main').textContent = 'SKIP';
+  } else {
+    actionBar.style.display = 'none';
+  }
+
+  // Update item button icons
+  if (items.style.display === 'flex') {
+    document.querySelectorAll('.touch-item-btn').forEach((btn, i) => {
+      btn.textContent = inventory[i] ? ITEMS[inventory[i]].icon : '';
+      btn.style.opacity = inventory[i] ? '1' : '0.3';
+    });
+  }
+
+  if (flashBtn.style.display === 'block') {
+    flashBtn.textContent = `⚡\n${fogFlashesLeft}`;
+  }
+}
+
+if (isTouchDevice) {
+  // D-pad
+  document.querySelectorAll('.touch-btn[data-dir]').forEach(btn => {
+    btn.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      const dir = btn.dataset.dir;
+      const keyMap = { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' };
+      simulateKey(keyMap[dir]);
+    }, { passive: false });
+  });
+
+  // Item buttons
+  document.querySelectorAll('.touch-item-btn').forEach(btn => {
+    btn.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      simulateKey(String(parseInt(btn.dataset.slot) + 1));
+    }, { passive: false });
+  });
+
+  // Flash button (fog mode)
+  document.getElementById('touch-flash-btn').addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    simulateKey(' ');
+  }, { passive: false });
+
+  // Main action button
+  document.getElementById('touch-action-main').addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    simulateKey('Enter');
+  }, { passive: false });
+
+  // Menu button
+  document.getElementById('touch-menu-btn').addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    simulateKey('Escape');
+  }, { passive: false });
+
+  // Splash screen nav — make tappable
+  document.getElementById('splash-profiles-btn')?.addEventListener('click', () => simulateKey('p'));
+  document.getElementById('splash-map-btn')?.addEventListener('click', () => simulateKey('m'));
+  document.getElementById('splash-lb-btn')?.addEventListener('click', () => simulateKey('Tab'));
+  document.getElementById('splash-export-btn')?.addEventListener('click', () => simulateKey('e'));
+  document.getElementById('splash-import-btn')?.addEventListener('click', () => simulateKey('i'));
+
+  // Prevent zooming on double-tap
+  document.addEventListener('touchstart', (e) => {
+    if (e.touches.length > 1) e.preventDefault();
+  }, { passive: false });
+
+  // Update touch UI periodically
+  setInterval(showTouchControls, 200);
+}
+
+// ═══════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════
 ensureDefaultProfile();
 updateSplashForProfile();
 updateItemSlots();
+
+// Touch-friendly adjustments
+if (isTouchDevice) {
+  // Hide "PRESS ENTER" hints — action bar replaces them
+  document.querySelectorAll('#death-screen p, #level-complete p').forEach(el => {
+    if (el.textContent.includes('PRESS') || el.textContent.includes('MAP') || el.textContent.includes('TAB')) el.style.display = 'none';
+  });
+  const labels = { 'splash-profiles-btn': 'PROFILES', 'splash-map-btn': 'LEVEL MAP', 'splash-lb-btn': 'LEADERBOARD', 'splash-export-btn': 'EXPORT SAVE', 'splash-import-btn': 'IMPORT SAVE' };
+  for (const [id, text] of Object.entries(labels)) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+  }
+  // Make splash navs bigger tap targets
+  document.querySelectorAll('.splash-nav').forEach(el => { el.style.padding = '10px 20px'; el.style.marginTop = '6px'; });
+}
+
 requestAnimationFrame(gameLoop);
 </script>
 </body>

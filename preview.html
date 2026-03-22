@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NEON RECALL — Map Preview</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a1a; font-family: 'Orbitron', monospace; color: #fff; padding: 24px; }
+  h1 { font-size: 18px; letter-spacing: 6px; color: #0ff; text-shadow: 0 0 20px rgba(0,255,255,0.5); margin-bottom: 8px; }
+  .controls { margin-bottom: 20px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .controls button { background: rgba(0,255,255,0.08); border: 1px solid rgba(0,255,255,0.3); color: #0ff; font-family: 'Orbitron', monospace; font-size: 10px; letter-spacing: 2px; padding: 8px 16px; border-radius: 4px; cursor: pointer; }
+  .controls button:hover { background: rgba(0,255,255,0.15); border-color: #0ff; }
+  .controls span { font-size: 10px; letter-spacing: 2px; color: rgba(255,255,255,0.4); }
+  .grid { display: flex; flex-wrap: wrap; gap: 20px; }
+  .map-card { background: rgba(0,255,255,0.03); border: 1px solid rgba(0,255,255,0.15); border-radius: 6px; padding: 12px; }
+  .map-card h3 { font-size: 10px; letter-spacing: 3px; color: #0ff; margin-bottom: 4px; }
+  .map-card .info { font-size: 8px; letter-spacing: 2px; color: rgba(255,255,255,0.3); margin-bottom: 8px; }
+  canvas { image-rendering: pixelated; display: block; border: 1px solid rgba(0,255,255,0.08); border-radius: 2px; }
+</style>
+</head>
+<body>
+<h1>MAP PREVIEW</h1>
+<div class="controls">
+  <button onclick="render(1,10)">LVL 1-10</button>
+  <button onclick="render(1,5)">LVL 1-5</button>
+  <button onclick="render(6,15)">LVL 6-15</button>
+  <button onclick="render(16,30)">LVL 16-30</button>
+  <button onclick="render(31,50)">LVL 31-50</button>
+  <button onclick="render(1,50)">ALL</button>
+  <button onclick="render(lastFrom,lastTo)">REGENERATE</button>
+  <span>CLICK REGENERATE FOR NEW RANDOM PATHS</span>
+</div>
+<div class="grid" id="grid"></div>
+
+<script>
+const GRID_COLS = 30, GRID_ROWS = 20, CHECKPOINT_INTERVAL = 15;
+const PX = 5; // pixels per cell
+
+function getLevelConfig(lvl) {
+  let pathLen, showTime, straightRun, minTurns;
+  if (lvl <= 5) {
+    pathLen = 10 + lvl * 3;
+    showTime = 12000;
+    straightRun = 2 + Math.floor(lvl / 2);
+    minTurns = 2 + lvl;
+  } else if (lvl <= 15) {
+    pathLen = 25 + (lvl - 5) * 4;
+    showTime = 10000;
+    straightRun = 3 + Math.floor((lvl - 5) / 3);
+    minTurns = 6 + (lvl - 5);
+  } else if (lvl <= 30) {
+    pathLen = 65 + (lvl - 15) * 3;
+    showTime = 8000;
+    straightRun = 4 + Math.floor((lvl - 15) / 5);
+    minTurns = 12 + (lvl - 15);
+  } else {
+    pathLen = 110 + (lvl - 30) * 2;
+    showTime = Math.max(6000, 8000 - (lvl - 30) * 100);
+    straightRun = 5;
+    minTurns = 20 + (lvl - 30);
+  }
+  return { pathLen, showTime, straightRun, minTurns };
+}
+
+function getLevelMode(lvl) {
+  if (lvl <= 5) return 'classic';
+  const modes = ['strobe','classic','fog','classic','reverse','classic','speedrun','classic','dark','classic','simon','classic'];
+  return modes[(lvl - 6) % modes.length];
+}
+
+function getPhaseName(lvl) {
+  if (lvl <= 5) return 'INITIALIZATION';
+  if (lvl <= 15) return 'CALIBRATION';
+  if (lvl <= 30) return 'DEEP GRID';
+  return 'MASTER GRID';
+}
+
+function generatePath(level) {
+  const cfg = getLevelConfig(level);
+  const len = cfg.pathLen;
+  const maxStraight = cfg.straightRun;
+  const visited = new Set();
+  const p = [];
+  let x = 3 + Math.floor(Math.random() * 4);
+  let y = Math.floor(GRID_ROWS / 2) + Math.floor(Math.random() * 5) - 2;
+  p.push({ x, y }); visited.add(`${x},${y}`);
+  const dirs = [{dx:1,dy:0},{dx:-1,dy:0},{dx:0,dy:1},{dx:0,dy:-1}];
+  let lastDir = {dx:1, dy:0};
+  let straightCount = 0, turnCount = 0;
+
+  for (let i = 1; i < len; i++) {
+    const mustTurn = straightCount >= maxStraight;
+    const turnsNeeded = cfg.minTurns - turnCount;
+    const stepsLeft = len - i;
+    const shouldTurn = mustTurn || (turnsNeeded > 0 && Math.random() < turnsNeeded / Math.max(stepsLeft, 1) * 1.5);
+
+    const isSameDir = d => d.dx === lastDir.dx && d.dy === lastDir.dy;
+
+    function neighborCount(nx, ny) {
+      let count = 0;
+      for (const d of dirs) {
+        const ax = nx + d.dx, ay = ny + d.dy;
+        if ((ax !== x || ay !== y) && visited.has(`${ax},${ay}`)) count++;
+      }
+      const diags = [{dx:1,dy:1},{dx:1,dy:-1},{dx:-1,dy:1},{dx:-1,dy:-1}];
+      for (const d of diags) {
+        const ax = nx + d.dx, ay = ny + d.dy;
+        if ((ax !== x || ay !== y) && visited.has(`${ax},${ay}`)) count++;
+      }
+      return count;
+    }
+
+    const allCandidates = dirs.filter(d => {
+      const nx = x + d.dx, ny = y + d.dy;
+      return nx >= 2 && nx < GRID_COLS-2 && ny >= 2 && ny < GRID_ROWS-2 && !visited.has(`${nx},${ny}`);
+    });
+    const thin = allCandidates.filter(d => neighborCount(x + d.dx, y + d.dy) <= 1);
+    const candidates = thin.length > 0 ? thin : allCandidates;
+    if (candidates.length === 0) break;
+
+    const turnDirs = candidates.filter(d => !isSameDir(d));
+    const straightDirs = candidates.filter(d => isSameDir(d));
+    let chosen;
+
+    if (shouldTurn && turnDirs.length > 0) {
+      const perp = turnDirs.filter(d => d.dx !== -lastDir.dx || d.dy !== -lastDir.dy);
+      const pool = perp.length > 0 ? perp : turnDirs;
+      chosen = pool[Math.floor(Math.random() * pool.length)];
+    } else if (straightDirs.length > 0 && !mustTurn) {
+      if (Math.random() < 0.6) chosen = straightDirs[0];
+      else if (turnDirs.length > 0) chosen = turnDirs[Math.floor(Math.random() * turnDirs.length)];
+      else chosen = straightDirs[0];
+    } else {
+      chosen = candidates[Math.floor(Math.random() * candidates.length)];
+    }
+
+    if (!isSameDir(chosen)) { turnCount++; straightCount = 1; } else { straightCount++; }
+    x += chosen.dx; y += chosen.dy;
+    p.push({x,y}); visited.add(`${x},${y}`);
+    lastDir = chosen;
+  }
+  return { path: p, turns: turnCount, cfg };
+}
+
+function drawMap(canvas, path) {
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#0a0a1a';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Grid
+  ctx.strokeStyle = 'rgba(0,255,255,0.06)';
+  ctx.lineWidth = 0.5;
+  for (let c = 0; c <= GRID_COLS; c++) {
+    ctx.beginPath(); ctx.moveTo(c*PX, 0); ctx.lineTo(c*PX, GRID_ROWS*PX); ctx.stroke();
+  }
+  for (let r = 0; r <= GRID_ROWS; r++) {
+    ctx.beginPath(); ctx.moveTo(0, r*PX); ctx.lineTo(GRID_COLS*PX, r*PX); ctx.stroke();
+  }
+
+  // Path
+  for (let i = 0; i < path.length; i++) {
+    const cell = path[i];
+    const isCp = i > 0 && i % CHECKPOINT_INTERVAL === 0 && i < path.length - 1;
+
+    if (i === 0) {
+      ctx.fillStyle = 'rgba(0,255,100,0.8)';
+    } else if (i === path.length - 1) {
+      ctx.fillStyle = 'rgba(255,0,200,0.8)';
+    } else if (isCp) {
+      ctx.fillStyle = 'rgba(0,255,255,0.7)';
+    } else {
+      ctx.fillStyle = 'rgba(0,255,100,0.4)';
+    }
+    ctx.fillRect(cell.x * PX, cell.y * PX, PX, PX);
+
+    // Draw direction arrows between cells
+    if (i > 0) {
+      const prev = path[i-1];
+      ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      ctx.moveTo(prev.x * PX + PX/2, prev.y * PX + PX/2);
+      ctx.lineTo(cell.x * PX + PX/2, cell.y * PX + PX/2);
+      ctx.stroke();
+    }
+
+    // Number every 5th cell
+    if (i > 0 && i % 5 === 0) {
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.font = '3px monospace';
+      ctx.fillText(i, cell.x * PX, cell.y * PX - 1);
+    }
+  }
+}
+
+let lastFrom = 1, lastTo = 10;
+
+function render(from, to) {
+  lastFrom = from; lastTo = to;
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+
+  for (let lvl = from; lvl <= to; lvl++) {
+    const { path, turns, cfg } = generatePath(lvl);
+
+    const card = document.createElement('div');
+    card.className = 'map-card';
+
+    const h = document.createElement('h3');
+    h.textContent = `LEVEL ${lvl} — ${getPhaseName(lvl)}`;
+    card.appendChild(h);
+
+    const info = document.createElement('div');
+    info.className = 'info';
+    const mode = getLevelMode(lvl);
+    const modeName = {classic:'CLASSIC',strobe:'STROBE',fog:'FOG',reverse:'REVERSE',speedrun:'SPEED RUN',dark:'DARK',simon:'SIMON'}[mode]||'CLASSIC';
+    info.textContent = `${path.length} STEPS · ${turns} TURNS · ${modeName} · REVEAL ${cfg.showTime/1000}s`;
+    card.appendChild(info);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = GRID_COLS * PX;
+    canvas.height = GRID_ROWS * PX;
+    card.appendChild(canvas);
+    drawMap(canvas, path);
+
+    grid.appendChild(card);
+  }
+}
+
+render(1, 10);
+</script>
+</body>
+</html>

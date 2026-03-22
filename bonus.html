@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEON RECALL — BONUS ROUND</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a1a; overflow: hidden; font-family: 'Orbitron', monospace; color: #fff; height: 100vh; width: 100vw; }
+  canvas { display: block; }
+  #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
+  #timer { position: absolute; top: 20px; right: 30px; font-size: 48px; font-weight: 900; letter-spacing: 4px; color: #0ff; text-shadow: 0 0 20px rgba(0,255,255,0.6); }
+  #timer.danger { color: #ff0040; text-shadow: 0 0 30px rgba(255,0,64,0.8); animation: timerPulse 0.5s ease-in-out infinite; }
+  @keyframes timerPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.15); } }
+  #score-display { position: absolute; top: 20px; left: 30px; font-size: 16px; letter-spacing: 4px; color: #0ff; text-shadow: 0 0 10px rgba(0,255,255,0.5); }
+  #found-items { position: absolute; top: 55px; left: 30px; font-size: 12px; letter-spacing: 2px; color: rgba(255,255,255,0.5); }
+  #center-msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); text-align: center; display: none; pointer-events: auto; }
+  #center-msg h1 { font-size: 36px; font-weight: 900; letter-spacing: 8px; margin-bottom: 12px; }
+  #center-msg p { font-size: 12px; letter-spacing: 3px; opacity: 0.6; margin-bottom: 6px; }
+  #results { margin: 16px 0; }
+  #results div { font-size: 13px; letter-spacing: 2px; margin: 4px 0; }
+  .scanline { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100; background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px); }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div class="scanline"></div>
+<div id="overlay">
+  <div id="timer">30</div>
+  <div id="score-display">PRIZES: <span id="prize-count">0</span></div>
+  <div id="found-items"></div>
+  <div id="center-msg">
+    <h1 id="msg-title"></h1>
+    <div id="results"></div>
+    <p id="msg-sub"></p>
+  </div>
+</div>
+<script>
+const CELL = 40;
+const COLS = 25, ROWS = 17;
+const BONUS_TIME = 30;
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+let W, H, ox, oy;
+function resize() { W = canvas.width = innerWidth; H = canvas.height = innerHeight; ox = (W - COLS*CELL)/2; oy = (H - ROWS*CELL)/2; }
+addEventListener('resize', resize); resize();
+
+// Audio
+let audioCtx;
+function initAudio() { if (!audioCtx) audioCtx = new (AudioContext || webkitAudioContext)(); }
+function playTone(f, d, t='square', v=0.08) {
+  if (!audioCtx) return;
+  const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+  o.type=t; o.frequency.value=f; g.gain.value=v;
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime+d);
+  o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime+d);
+}
+
+// Prize types
+const PRIZES = [
+  { icon: '⚡', name: 'ENERGY CORE', color: '#ff0', rarity: 0.35 },
+  { icon: '💎', name: 'DATA CRYSTAL', color: '#0ff', rarity: 0.25 },
+  { icon: '🔮', name: 'VOID SHARD', color: '#f0f', rarity: 0.15 },
+  { icon: '👁', name: 'ECHO SCAN', color: '#ff0', rarity: 0.12 },
+  { icon: '🛡', name: 'FIREWALL', color: '#0f0', rarity: 0.08 },
+  { icon: '🌟', name: 'NEON STAR', color: '#fff', rarity: 0.05 },
+];
+
+// State
+let state = 'intro'; // intro, playing, ended
+let px, py; // player grid position
+let visited = new Set();
+let prizeMap = {}; // "x,y" -> prize object
+let found = [];
+let timeLeft = BONUS_TIME;
+let startTime = 0;
+let pulseTime = 0;
+let particles = [];
+let lastTickSecond = -1;
+
+// Place prizes — sparse, ~8-12 total
+function initBoard() {
+  visited.clear();
+  prizeMap = {};
+  found = [];
+  px = Math.floor(COLS/2);
+  py = Math.floor(ROWS/2);
+  visited.add(`${px},${py}`);
+
+  // Place prizes randomly
+  const count = 8 + Math.floor(Math.random() * 5); // 8-12
+  let placed = 0;
+  let attempts = 0;
+  while (placed < count && attempts < 500) {
+    attempts++;
+    const x = Math.floor(Math.random() * COLS);
+    const y = Math.floor(Math.random() * ROWS);
+    const key = `${x},${y}`;
+    // Don't place on/near start
+    if (Math.abs(x - px) <= 2 && Math.abs(y - py) <= 2) continue;
+    if (prizeMap[key]) continue;
+
+    // Pick prize by rarity
+    const roll = Math.random();
+    let cumulative = 0;
+    let prize = PRIZES[0];
+    for (const p of PRIZES) {
+      cumulative += p.rarity;
+      if (roll <= cumulative) { prize = p; break; }
+    }
+    prizeMap[key] = { ...prize };
+    placed++;
+  }
+}
+
+function spawnParticles(wx, wy, color, count=15) {
+  for (let i=0;i<count;i++) {
+    const a=(Math.PI*2/count)*i+Math.random()*0.5, s=1.5+Math.random()*4;
+    particles.push({x:wx,y:wy,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:1,decay:0.012+Math.random()*0.02,color,size:2+Math.random()*4});
+  }
+}
+
+// Sounds
+function sfxMove() { playTone(300+found.length*30, 0.06, 'sine', 0.05); }
+function sfxPrize(prize) {
+  const rare = PRIZES.indexOf(PRIZES.find(p=>p.name===prize.name));
+  const baseFreq = 600 + rare * 100;
+  playTone(baseFreq, 0.15, 'sine', 0.1);
+  setTimeout(() => playTone(baseFreq*1.25, 0.15, 'sine', 0.1), 80);
+  setTimeout(() => playTone(baseFreq*1.5, 0.2, 'sine', 0.12), 160);
+}
+function sfxTick() { playTone(800, 0.03, 'square', 0.04); }
+function sfxTickDanger() { playTone(400, 0.08, 'sawtooth', 0.08); }
+function sfxTimeUp() {
+  playTone(200, 0.5, 'sawtooth', 0.12);
+  setTimeout(() => playTone(150, 0.6, 'sawtooth', 0.1), 200);
+}
+function sfxCountdown321() { playTone(600, 0.1, 'sine', 0.08); }
+function sfxGo() {
+  playTone(880, 0.15, 'sine', 0.12);
+  setTimeout(() => playTone(1320, 0.2, 'sine', 0.12), 80);
+}
+function sfxHeartbeat() {
+  playTone(80, 0.15, 'sine', 0.12);
+  setTimeout(() => playTone(80, 0.1, 'sine', 0.08), 200);
+}
+
+// Start
+function startBonus() {
+  initAudio();
+  state = 'intro';
+  initBoard();
+  document.getElementById('center-msg').style.display = 'none';
+  // 3-2-1-GO
+  let count = 3;
+  const timerEl = document.getElementById('timer');
+  function tick() {
+    if (count > 0) {
+      timerEl.textContent = count;
+      sfxCountdown321();
+      count--;
+      setTimeout(tick, 800);
+    } else {
+      timerEl.textContent = BONUS_TIME;
+      sfxGo();
+      state = 'playing';
+      startTime = performance.now();
+      timeLeft = BONUS_TIME;
+      lastTickSecond = BONUS_TIME;
+    }
+  }
+  tick();
+}
+
+function endBonus() {
+  state = 'ended';
+  sfxTimeUp();
+  const msg = document.getElementById('center-msg');
+  const title = document.getElementById('msg-title');
+  const results = document.getElementById('results');
+  const sub = document.getElementById('msg-sub');
+
+  title.textContent = 'TIME UP';
+  title.style.color = '#ff0040';
+  title.style.textShadow = '0 0 30px rgba(255,0,64,0.8)';
+
+  let html = '';
+  if (found.length === 0) {
+    html = '<div style="color:rgba(255,255,255,0.3);">NO PRIZES FOUND</div>';
+  } else {
+    for (const f of found) {
+      html += `<div style="color:${f.color};">${f.icon} ${f.name}</div>`;
+    }
+  }
+  html += `<div style="margin-top:12px;color:#0ff;">${visited.size} CELLS EXPLORED</div>`;
+  results.innerHTML = html;
+  sub.textContent = 'PRESS ENTER TO RESTART';
+  msg.style.display = 'block';
+}
+
+// Input
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    if (state === 'ended' || state === 'intro') { startBonus(); return; }
+  }
+  if (state !== 'playing') return;
+
+  let dx=0, dy=0;
+  if (e.key==='ArrowUp'||e.key==='w'||e.key==='W') dy=-1;
+  else if (e.key==='ArrowDown'||e.key==='s'||e.key==='S') dy=1;
+  else if (e.key==='ArrowLeft'||e.key==='a'||e.key==='A') dx=-1;
+  else if (e.key==='ArrowRight'||e.key==='d'||e.key==='D') dx=1;
+  else return;
+  e.preventDefault();
+
+  const nx=px+dx, ny=py+dy;
+  if (nx<0||nx>=COLS||ny<0||ny>=ROWS) return;
+
+  px=nx; py=ny;
+  const key=`${px},${py}`;
+  visited.add(key);
+  sfxMove();
+
+  // Check prize
+  if (prizeMap[key]) {
+    const prize = prizeMap[key];
+    found.push(prize);
+    delete prizeMap[key];
+    sfxPrize(prize);
+    const wx = ox + px*CELL + CELL/2, wy = oy + py*CELL + CELL/2;
+    spawnParticles(wx, wy, prize.color, 25);
+    document.getElementById('prize-count').textContent = found.length;
+    // Update found items display
+    document.getElementById('found-items').innerHTML = found.map(f => `<span style="color:${f.color}">${f.icon}</span>`).join(' ');
+  }
+});
+
+// Render
+function drawGrid() {
+  for (let c=0; c<=COLS; c++) {
+    ctx.strokeStyle = 'rgba(0,255,255,0.05)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(ox+c*CELL, oy); ctx.lineTo(ox+c*CELL, oy+ROWS*CELL); ctx.stroke();
+  }
+  for (let r=0; r<=ROWS; r++) {
+    ctx.beginPath(); ctx.moveTo(ox, oy+r*CELL); ctx.lineTo(ox+COLS*CELL, oy+r*CELL); ctx.stroke();
+  }
+}
+
+function drawCells() {
+  // Visited cells
+  for (const key of visited) {
+    const [x,y] = key.split(',').map(Number);
+    const cx = ox+x*CELL, cy = oy+y*CELL;
+    ctx.fillStyle = 'rgba(0,100,255,0.12)';
+    ctx.fillRect(cx+1, cy+1, CELL-2, CELL-2);
+  }
+
+  // Hidden prizes — subtle shimmer only (don't reveal what they are)
+  for (const key in prizeMap) {
+    const [x,y] = key.split(',').map(Number);
+    const cx = ox+x*CELL+CELL/2, cy = oy+y*CELL+CELL/2;
+    // Very faint sparkle that's easy to miss
+    const shimmer = Math.sin(pulseTime*4 + x*3 + y*5) * 0.5 + 0.5;
+    if (shimmer > 0.85) {
+      ctx.fillStyle = `rgba(255,255,255,${(shimmer-0.85)*0.6})`;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 1.5, 0, Math.PI*2);
+      ctx.fill();
+    }
+  }
+}
+
+function drawPlayer() {
+  if (state !== 'playing') return;
+  const x = ox + px*CELL + CELL/2, y = oy + py*CELL + CELL/2;
+
+  // Glow
+  const grad = ctx.createRadialGradient(x,y,0,x,y,CELL*1.8);
+  grad.addColorStop(0, 'rgba(0,255,255,0.12)');
+  grad.addColorStop(1, 'rgba(0,255,255,0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(x-CELL*2, y-CELL*2, CELL*4, CELL*4);
+
+  const p = Math.sin(pulseTime*5)*2;
+  ctx.beginPath(); ctx.arc(x,y,8+p,0,Math.PI*2);
+  ctx.fillStyle='#0ff'; ctx.shadowColor='#0ff'; ctx.shadowBlur=20; ctx.fill(); ctx.shadowBlur=0;
+  ctx.beginPath(); ctx.arc(x,y,4,0,Math.PI*2);
+  ctx.fillStyle='#fff'; ctx.fill();
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    ctx.globalAlpha=p.life;
+    ctx.fillStyle=p.color; ctx.shadowColor=p.color; ctx.shadowBlur=6;
+    ctx.fillRect(p.x-p.size/2, p.y-p.size/2, p.size, p.size);
+  }
+  ctx.globalAlpha=1; ctx.shadowBlur=0;
+}
+
+let lastTime=0;
+function gameLoop(now) {
+  const dt = Math.min(now-lastTime, 50);
+  lastTime = now;
+  pulseTime += dt*0.001;
+
+  // Update time
+  if (state === 'playing') {
+    const elapsed = (now - startTime) / 1000;
+    timeLeft = Math.max(0, BONUS_TIME - elapsed);
+    const sec = Math.ceil(timeLeft);
+    const timerEl = document.getElementById('timer');
+    timerEl.textContent = sec;
+
+    // Timer sounds
+    if (sec !== lastTickSecond) {
+      lastTickSecond = sec;
+      if (sec <= 5 && sec > 0) {
+        sfxHeartbeat();
+      } else if (sec <= 10 && sec > 5) {
+        sfxTickDanger();
+      } else if (sec > 10) {
+        sfxTick();
+      }
+    }
+
+    timerEl.className = timeLeft <= 10 ? 'danger' : '';
+
+    if (timeLeft <= 0) endBonus();
+  }
+
+  // Update particles
+  for (let i=particles.length-1;i>=0;i--) {
+    const p=particles[i]; p.x+=p.vx; p.y+=p.vy; p.vx*=0.96; p.vy*=0.96; p.life-=p.decay;
+    if(p.life<=0) particles.splice(i,1);
+  }
+
+  // Draw
+  ctx.fillStyle='#0a0a1a'; ctx.fillRect(0,0,W,H);
+
+  // Ambient
+  const ag=ctx.createRadialGradient(W/2,H/2,0,W/2,H/2,W*0.6);
+  ag.addColorStop(0,'rgba(0,20,40,0.3)'); ag.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=ag; ctx.fillRect(0,0,W,H);
+
+  // Danger pulse when time low
+  if (state === 'playing' && timeLeft <= 10) {
+    const dangerPulse = Math.sin(pulseTime * (timeLeft <= 5 ? 8 : 4)) * 0.5 + 0.5;
+    ctx.fillStyle = `rgba(255,0,40,${dangerPulse * 0.05})`;
+    ctx.fillRect(0,0,W,H);
+  }
+
+  drawGrid();
+  drawCells();
+  drawPlayer();
+  drawParticles();
+
+  requestAnimationFrame(gameLoop);
+}
+
+// Show intro
+document.getElementById('center-msg').style.display = 'block';
+document.getElementById('msg-title').textContent = 'BONUS ROUND';
+document.getElementById('msg-title').style.color = '#ff0';
+document.getElementById('msg-title').style.textShadow = '0 0 30px rgba(255,255,0,0.6)';
+document.getElementById('results').innerHTML = '<div style="color:rgba(255,255,255,0.5);">EXPLORE THE GRID. FIND HIDDEN PRIZES.</div><div style="color:rgba(255,255,255,0.3);margin-top:4px;">30 SECONDS. LOOK FOR THE SHIMMER.</div>';
+document.getElementById('msg-sub').textContent = 'PRESS ENTER TO START';
+
+requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>

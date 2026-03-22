@@ -1056,6 +1056,8 @@ function generatePath() {
   return p;
 }
 
+let pathCenterX = 0, pathCenterY = 0; // grid center of current path
+
 function zoomToPath() {
   if (!path.length) { CELL = 48; resize(); return; }
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -1065,16 +1067,22 @@ function zoomToPath() {
     if (p.y < minY) minY = p.y;
     if (p.y > maxY) maxY = p.y;
   }
-  // Add padding of 3 cells around the bounding box
+  pathCenterX = (minX + maxX) / 2;
+  pathCenterY = (minY + maxY) / 2;
+
   const padCells = 3;
   const spanX = (maxX - minX + 1) + padCells * 2;
   const spanY = (maxY - minY + 1) + padCells * 2;
-  // Fit to 85% of screen
-  const fitW = (W * 0.85) / spanX;
-  const fitH = (H * 0.85) / spanY;
+
+  // On touch devices, reserve space for d-pad (right) and items (left)
+  const usableW = isTouchDevice ? W * 0.65 : W * 0.85;
+  // Reserve space for HUD (top) and controls (bottom)
+  const usableH = isTouchDevice ? H * 0.60 : H * 0.85;
+
+  const fitW = usableW / spanX;
+  const fitH = usableH / spanY;
   CELL = Math.floor(Math.min(fitW, fitH));
-  // Clamp between 32 and 80
-  CELL = Math.max(32, Math.min(80, CELL));
+  CELL = Math.max(24, Math.min(80, CELL));
   resize();
 }
 
@@ -2225,9 +2233,21 @@ function updateParticles(dt) {
 
 function updateCamera() {
   if (!path.length) return;
-  const cell=path[Math.min(playerPos,path.length-1)];
-  targetCamX=offsetX+cell.x*CELL+CELL/2-W/2; targetCamY=offsetY+cell.y*CELL+CELL/2-H/2;
-  cameraX+=(targetCamX-cameraX)*0.06; cameraY+=(targetCamY-cameraY)*0.06;
+
+  if (state === 'showing' || state === 'countdown') {
+    // Center on the path's bounding box center so the whole path is visible
+    targetCamX = offsetX + pathCenterX * CELL + CELL/2 - W/2;
+    targetCamY = offsetY + pathCenterY * CELL + CELL/2 - H/2;
+  } else {
+    // Follow player during gameplay
+    const cell = path[Math.min(playerPos, path.length-1)];
+    targetCamX = offsetX + cell.x * CELL + CELL/2 - W/2;
+    targetCamY = offsetY + cell.y * CELL + CELL/2 - H/2;
+  }
+
+  const speed = (state === 'showing' || state === 'countdown') ? 0.04 : 0.06;
+  cameraX += (targetCamX - cameraX) * speed;
+  cameraY += (targetCamY - cameraY) * speed;
 }
 
 // ═══════════════════════════════════════════════════════

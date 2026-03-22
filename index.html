@@ -2414,7 +2414,7 @@ function showTouchControls() {
   if (items.style.display === 'flex') {
     document.querySelectorAll('.touch-item-btn').forEach((btn, i) => {
       btn.textContent = inventory[i] ? ITEMS[inventory[i]].icon : '';
-      btn.style.opacity = inventory[i] ? '1' : '0.3';
+      btn.style.display = inventory[i] ? 'flex' : 'none';
     });
   }
 

@@ -166,14 +166,33 @@
     #pause-scores, #pause-legend { margin: 10px 0; }
   }
 
-  /* ── LANDSCAPE LOCK ── */
-  #rotate-screen { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #0a0a1a; z-index: 9999; flex-direction: column; align-items: center; justify-content: center; text-align: center; font-family: 'Orbitron', monospace; }
-  #rotate-screen .rotate-icon { font-size: 64px; margin-bottom: 24px; animation: rotateWobble 2s ease-in-out infinite; }
-  #rotate-screen .rotate-text { font-size: 16px; letter-spacing: 6px; color: #0ff; text-shadow: 0 0 15px rgba(0,255,255,0.5); margin-bottom: 8px; }
-  #rotate-screen .rotate-sub { font-size: 11px; letter-spacing: 3px; color: rgba(255,255,255,0.4); }
-  @keyframes rotateWobble { 0%,100% { transform: rotate(-15deg); } 50% { transform: rotate(15deg); } }
-  @media (orientation: portrait) and (max-width: 1024px) and (hover: none) {
-    #rotate-screen { display: flex !important; }
+  /* ── PORTRAIT MOBILE ── */
+  @media (orientation: portrait) and (hover: none) {
+    #hud { flex-direction: column; gap: 4px; align-items: flex-start; }
+    #hud-right { flex-direction: row; align-items: center; gap: 8px; }
+    .hud-item { font-size: 9px; padding: 4px 8px; letter-spacing: 1px; }
+    #hud-mode { font-size: 8px !important; }
+    #touch-controls { bottom: 10px; right: 10px; }
+    .touch-dpad { grid-template-columns: 48px 48px 48px; grid-template-rows: 48px 48px 48px; gap: 3px; }
+    .touch-btn { width: 48px; height: 48px; font-size: 18px; }
+    #touch-items { bottom: 10px; left: 10px; }
+    .touch-item-btn { width: 44px; height: 44px; font-size: 20px; }
+    #touch-flash-btn { bottom: 170px; right: 10px; width: 52px; height: 52px; font-size: 9px; }
+    #touch-action-bar { bottom: 10px; }
+    .touch-action { padding: 12px 24px; font-size: 12px; }
+    #countdown { font-size: 48px; top: 8%; }
+    #phase-indicator { font-size: 16px; letter-spacing: 4px; }
+    #death-screen h2 { font-size: 28px; }
+    #death-screen p { font-size: 12px; }
+    #level-complete h2 { font-size: 28px; }
+    #score-display { font-size: 12px; }
+    #xp-gain { font-size: 11px; }
+    #reward-popup .reward-icon { font-size: 36px; }
+    #reward-popup .reward-text { font-size: 13px; }
+    #reward-popup .reward-desc { font-size: 10px; }
+    #splash-game-title { font-size: 22px; letter-spacing: 8px; }
+    #profile-card #block-letters { font-size: 4px; }
+    .splash-nav { font-size: 11px; }
   }
 
   .scanline { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100; background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px); }
@@ -181,11 +200,6 @@
 </style>
 </head>
 <body>
-<div id="rotate-screen">
-  <div class="rotate-icon">📱</div>
-  <div class="rotate-text">ROTATE DEVICE</div>
-  <div class="rotate-sub">LANDSCAPE MODE REQUIRED</div>
-</div>
 <canvas id="game"></canvas>
 <div class="scanline"></div>
 <div class="vignette"></div>

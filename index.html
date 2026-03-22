@@ -115,7 +115,7 @@
   #levelup-popup .levelup-ability { font-size: 11px; color: #0f0; letter-spacing: 3px; opacity: 0.8; }
 
   /* ── PAUSE MENU ── */
-  #pause-menu { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: none; pointer-events: auto; z-index: 70; background: rgba(0,5,15,0.97); border: 1px solid rgba(0,255,255,0.3); border-radius: 8px; padding: 32px 48px; min-width: 380px; box-shadow: 0 0 60px rgba(0,255,255,0.15), inset 0 0 40px rgba(0,255,255,0.02); text-align: center; }
+  #pause-menu { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: none; pointer-events: auto; z-index: 70; background: rgba(0,5,15,0.97); border: 1px solid rgba(0,255,255,0.3); border-radius: 8px; padding: 24px 32px; min-width: 340px; max-width: 90vw; max-height: 85vh; overflow-y: auto; box-shadow: 0 0 60px rgba(0,255,255,0.15), inset 0 0 40px rgba(0,255,255,0.02); text-align: center; }
   #pause-menu h2 { font-size: 22px; letter-spacing: 8px; color: #0ff; text-shadow: 0 0 25px rgba(0,255,255,0.7); margin-bottom: 24px; }
   .pause-btn { display: block; width: 100%; background: rgba(0,255,255,0.05); border: 1px solid rgba(0,255,255,0.2); padding: 14px 20px; border-radius: 6px; color: #fff; font-family: 'Orbitron', monospace; font-size: 13px; letter-spacing: 4px; cursor: pointer; margin-bottom: 10px; transition: all 0.2s; text-align: center; }
   .pause-btn:hover { border-color: #0ff; background: rgba(0,255,255,0.12); box-shadow: 0 0 15px rgba(0,255,255,0.2); color: #0ff; }
@@ -146,10 +146,25 @@
   .touch-item-btn:active { background: rgba(0,255,255,0.2); border-color: #0ff; }
   #touch-flash-btn { position: absolute; bottom: 200px; right: 20px; display: none; z-index: 20; pointer-events: auto; width: 64px; height: 64px; border: 1px solid rgba(255,255,0,0.4); border-radius: 50%; background: rgba(255,255,0,0.08); color: #ff0; font-size: 11px; font-family: 'Orbitron', monospace; letter-spacing: 2px; text-align: center; line-height: 1.2; cursor: pointer; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
   #touch-flash-btn:active { background: rgba(255,255,0,0.2); box-shadow: 0 0 15px rgba(255,255,0,0.3); }
-  #touch-action-bar { display: none; position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 20; pointer-events: auto; }
+  #touch-action-bar { display: none; position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 55; pointer-events: auto; }
   .touch-action { padding: 14px 28px; border: 1px solid rgba(0,255,255,0.3); border-radius: 10px; background: rgba(0,10,20,0.7); color: #0ff; font-family: 'Orbitron', monospace; font-size: 14px; letter-spacing: 4px; cursor: pointer; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
   .touch-action:active { background: rgba(0,255,255,0.2); border-color: #0ff; }
   #touch-menu-btn { display: none; position: absolute; top: 20px; right: 20px; z-index: 20; pointer-events: auto; width: 44px; height: 44px; border: 1px solid rgba(0,255,255,0.3); border-radius: 8px; background: rgba(0,10,20,0.7); color: #0ff; font-size: 20px; cursor: pointer; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+
+  /* ── MOBILE RESPONSIVE ── */
+  @media (max-height: 500px), (max-width: 800px) {
+    .hud-item { font-size: 10px; padding: 5px 10px; letter-spacing: 1px; }
+    #xp-bar-container { display: none; }
+    #hud-perk { display: none !important; }
+    .item-slot { width: 34px; height: 34px; font-size: 16px; }
+    .item-slot .item-key { display: none; }
+    #pause-menu { padding: 16px 20px; min-width: 280px; }
+    #pause-menu h2 { font-size: 18px; margin-bottom: 14px; }
+    .pause-btn { padding: 10px 14px; font-size: 11px; }
+    .legend-grid { grid-template-columns: 1fr; gap: 6px; }
+    .legend-desc { display: none; }
+    #pause-scores, #pause-legend { margin: 10px 0; }
+  }
 
   /* ── LANDSCAPE LOCK ── */
   #rotate-screen { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #0a0a1a; z-index: 9999; flex-direction: column; align-items: center; justify-content: center; text-align: center; font-family: 'Orbitron', monospace; }
@@ -2298,6 +2313,34 @@ function gameLoop(now) {
 // ═══════════════════════════════════════════════════════
 const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 
+function handleTouchInput(action) {
+  initAudio();
+  if (action === 'enter') {
+    if (bonusActive && bonusState === 'ended') { nextLevel(); return; }
+    if (state === 'splash') { startGame(); return; }
+    if (state === 'dead') { respawn(); return; }
+    if (state === 'complete') { nextLevel(); return; }
+    if (state === 'countdown' || state === 'showing') {
+      if (showTimeoutId) { clearTimeout(showTimeoutId); showTimeoutId = null; }
+      countdownEl.style.display = 'none';
+      phaseIndicator.style.display = 'none';
+      state = 'playing';
+      if (strobeActive) strobeStartTime = performance.now();
+      if (currentMode === 'speedrun') { speedrunTimer = performance.now(); speedrunTimeLeft = path.length * 350; }
+      sfxGo();
+    }
+    return;
+  }
+  if (action === 'escape') { showPauseMenu(); return; }
+  if (action === 'space') { simulateKey(' '); return; }
+  // Directions
+  const dirMap = { up:'ArrowUp', down:'ArrowDown', left:'ArrowLeft', right:'ArrowRight' };
+  if (dirMap[action]) { simulateKey(dirMap[action]); return; }
+  // Items
+  if (action === '1' || action === '2' || action === '3') { simulateKey(action); return; }
+}
+
+// Fallback for cases where direct dispatch is needed
 function simulateKey(key) {
   document.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
 }
@@ -2347,52 +2390,64 @@ function showTouchControls() {
 }
 
 if (isTouchDevice) {
-  // D-pad
+  // D-pad — use both touchstart and click for iOS reliability
   document.querySelectorAll('.touch-btn[data-dir]').forEach(btn => {
-    btn.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      const dir = btn.dataset.dir;
-      const keyMap = { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' };
-      simulateKey(keyMap[dir]);
-    }, { passive: false });
+    const handler = (e) => { e.preventDefault(); handleTouchInput(btn.dataset.dir); };
+    btn.addEventListener('touchstart', handler, { passive: false });
   });
 
   // Item buttons
   document.querySelectorAll('.touch-item-btn').forEach(btn => {
-    btn.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      simulateKey(String(parseInt(btn.dataset.slot) + 1));
-    }, { passive: false });
+    const handler = (e) => { e.preventDefault(); handleTouchInput(String(parseInt(btn.dataset.slot) + 1)); };
+    btn.addEventListener('touchstart', handler, { passive: false });
   });
 
   // Flash button (fog mode)
   document.getElementById('touch-flash-btn').addEventListener('touchstart', (e) => {
-    e.preventDefault();
-    simulateKey(' ');
+    e.preventDefault(); handleTouchInput('space');
   }, { passive: false });
 
-  // Main action button
-  document.getElementById('touch-action-main').addEventListener('touchstart', (e) => {
-    e.preventDefault();
-    simulateKey('Enter');
-  }, { passive: false });
+  // Main action button — both touchstart and click for iOS
+  const actionMain = document.getElementById('touch-action-main');
+  const actionHandler = (e) => { e.preventDefault(); e.stopPropagation(); handleTouchInput('enter'); };
+  actionMain.addEventListener('touchstart', actionHandler, { passive: false });
+  actionMain.addEventListener('click', actionHandler);
 
   // Menu button
-  document.getElementById('touch-menu-btn').addEventListener('touchstart', (e) => {
-    e.preventDefault();
-    simulateKey('Escape');
-  }, { passive: false });
+  const menuHandler = (e) => { e.preventDefault(); handleTouchInput('escape'); };
+  document.getElementById('touch-menu-btn').addEventListener('touchstart', menuHandler, { passive: false });
+  document.getElementById('touch-menu-btn').addEventListener('click', menuHandler);
 
-  // Splash screen nav — make tappable
-  document.getElementById('splash-profiles-btn')?.addEventListener('click', () => simulateKey('p'));
-  document.getElementById('splash-map-btn')?.addEventListener('click', () => simulateKey('m'));
-  document.getElementById('splash-lb-btn')?.addEventListener('click', () => simulateKey('Tab'));
-  document.getElementById('splash-export-btn')?.addEventListener('click', () => simulateKey('e'));
-  document.getElementById('splash-import-btn')?.addEventListener('click', () => simulateKey('i'));
+  // Pause menu buttons — ensure they work on touch
+  document.getElementById('pause-resume').addEventListener('touchstart', (e) => { e.preventDefault(); resumeGame(); }, { passive: false });
+  document.getElementById('pause-quit').addEventListener('touchstart', (e) => { e.preventDefault(); quitToMenu(); }, { passive: false });
+  document.getElementById('pause-map').addEventListener('touchstart', (e) => { e.preventDefault(); hidePauseMenu(); openPanel('map'); }, { passive: false });
 
-  // Prevent zooming on double-tap
+  // Splash screen nav
+  const navActions = {
+    'splash-profiles-btn': () => { showLoginScreen(); sfxMenu(); },
+    'splash-map-btn': () => openPanel('map'),
+    'splash-lb-btn': () => openPanel('leaderboard'),
+    'splash-export-btn': () => exportSave(),
+    'splash-import-btn': () => document.getElementById('import-file').click(),
+  };
+  for (const [id, fn] of Object.entries(navActions)) {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('touchstart', (e) => { e.preventDefault(); fn(); }, { passive: false });
+      el.addEventListener('click', fn);
+    }
+  }
+
+  // Prevent zooming on double-tap / pinch
   document.addEventListener('touchstart', (e) => {
     if (e.touches.length > 1) e.preventDefault();
+  }, { passive: false });
+  let lastTap = 0;
+  document.addEventListener('touchend', (e) => {
+    const now = Date.now();
+    if (now - lastTap < 300) e.preventDefault();
+    lastTap = now;
   }, { passive: false });
 
   // Update touch UI periodically
